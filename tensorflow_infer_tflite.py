@@ -132,15 +132,15 @@ def run_on_video(video_path, output_video_name, conf_thresh):
                       target_shape=(260, 260),
                       draw_result=True,
                       show_result=False))
-            print(out_results)
+            #print(out_results)
             #Appending class id to Label List
             LabelList.append(Label)
             if len(LabelList) == 3:
-                print(LabelList)
+                print("Original Label list over window of 3 is "+str(LabelList))
                 #applying median filter with window of 3
                 FinalLabel = np.unique(sig.medfilt(LabelList,3))
                 LabelList=[]
-                print(FinalLabel)
+                print("Final Label after Median filtering is "+str(FinalLabel))
             else:
                 FinalLabel = Label
             #Applying median filter on a window of 5
