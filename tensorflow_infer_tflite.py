@@ -2,14 +2,14 @@
 import cv2
 import time
 import argparse
-import scipy.signal as sig
+
 import numpy as np
 from PIL import Image
 #from keras.models import model_from_json
 from utils.anchor_generator import generate_anchors
 from utils.anchor_decode import decode_bbox
 from utils.nms import single_class_non_max_suppression
-from load_model.tensorflow_loader_tflite    import load_tf_model, tf_inference
+from load_model.tensorflow_loader_tflite import load_tf_model, tf_inference
 
 sess, graph = load_tf_model('models/face_mask_detection.tflite')
 # anchor configuration
@@ -46,7 +46,6 @@ def inference(image,
     '''
     # image = np.copy(image)
     output_info = []
-    out_results = []
     height, width, _ = image.shape
     image_resized = cv2.resize(image, target_shape)
     image_np = image_resized / 255.0  # 归一化到0~1
@@ -69,38 +68,27 @@ def inference(image,
 
     for idx in keep_idxs:
         conf = float(bbox_max_scores[idx])
-        out_results.append(conf)
         class_id = bbox_max_score_classes[idx]
-
-        #print(class_id)
-
         bbox = y_bboxes[idx]
         # clip the coordinate, avoid the value exceed the image boundary.
         xmin = max(0, int(bbox[0] * width))
-        out_results.append(xmin)
         ymin = max(0, int(bbox[1] * height))
-        out_results.append(ymin)
         xmax = min(int(bbox[2] * width), width)
-        out_results.append(xmax)
         ymax = min(int(bbox[3] * height), height)
-        out_results.append(ymax)
-        #out_results.append(conf, xmin,ymin,xmax,ymax)
-        #if draw_result:
-        #    if class_id == 0:
-        #        color = (0, 255, 0)
-        #    else:
-        #        color = (255, 0, 0)
-        #    cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 3)
-        #    cv2.putText(image, "%s" % (id2class[class_id]), (xmin + 1, ymin - 3),
-        #                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color)
-        #output_info.append([class_id, conf, xmin, ymin, xmax, ymax])
-        #only appending class id
-        output_info.append(class_id)
 
+        if draw_result:
+            if class_id == 0:
+                color = (0, 255, 0)
+            else:
+                color = (255, 0, 0)
+            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 3)
+            cv2.putText(image, "%s" % (id2class[class_id]), (xmin + 1, ymin - 3),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color)
+        output_info.append([class_id, conf, xmin, ymin, xmax, ymax])
 
     if show_result:
         Image.fromarray(image).show()
-    return output_info, out_results
+    return output_info
 
 
 def run_on_video(video_path, output_video_name, conf_thresh):
@@ -117,47 +105,19 @@ def run_on_video(video_path, output_video_name, conf_thresh):
     status = True
     idx = 0
     key = cv2.waitKey(1)
-    LabelList=[]
     while status:
         start_stamp = time.time()
         status, img_raw = cap.read()
         read_frame_stamp = time.time()
         if (status):
             img_rgb = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
-            ##Median filter logic below :::
-            #fetching the label per frame, Confidence score and BBox
-            Label, out_results= (inference(img_rgb,
+            inference(img_rgb,
                       conf_thresh,
                       iou_thresh=0.5,
                       target_shape=(260, 260),
                       draw_result=True,
-                      show_result=False))
-            #print(out_results)
-            #Appending class id to Label List
-            LabelList.append(Label)
-            if len(LabelList) == 3:
-                print("Original Label list over window of 3 is "+str(LabelList))
-                #applying median filter with window of 3
-                FinalLabel = np.unique(sig.medfilt(LabelList,3))
-                LabelList=[]
-                print("Final Label after Median filtering is "+str(FinalLabel))
-            else:
-                FinalLabel = Label
-            #Applying median filter on a window of 5
-
-            #print(len(LabelList))
-            if FinalLabel == 0 :
-                color = (0, 255, 0)
-            else:
-                color = (255, 0, 0)
-            #cv2.rectangle(img_rgb, (xmin, ymin), (xmax, ymax), color, 3)
-            #cv2.putText(img_rgb, "%s" % (id2class[FinalLabel]), (xmin + 1, ymin - 3),
-            #                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color)
-
-
-            #cv2.imshow('image', img_rgb[:, :, ::-1])
-            img_rgb = cv2.cvtColor (img_rgb, cv2.COLOR_RGB2BGR)
-            cv2.imshow ('image', img_rgb)
+                      show_result=False)
+            cv2.imshow('image', img_rgb[:, :, ::-1])
             key = cv2.waitKey(10)
             inference_stamp = time.time()
             img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
